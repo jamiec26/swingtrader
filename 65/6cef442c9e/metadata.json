@@ -1,0 +1,46 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "656cef442c9e",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitignore",
+    "HANDOFF.md",
+    "index.html",
+    "package.json",
+    "src/api/client.ts",
+    "src/components/board/OpportunityBoard.tsx",
+    "src/components/layout/CommandPalette.tsx",
+    "src/components/layout/NavRail.tsx",
+    "src/components/scan/MarketScan.tsx",
+    "src/components/ui/Button.tsx",
+    "src/components/ui/KpiTile.tsx",
+    "src/components/ui/RRBar.tsx",
+    "src/components/ui/ScoreBar.tsx",
+    "src/components/ui/SignalBadge.tsx",
+    "src/components/workspace/KagiChart.tsx",
+    "src/components/workspace/SignalPanel.tsx",
+    "src/store/index.ts",
+    "src/styles/globals.css",
+    "src/types/index.ts",
+    "tsconfig.json",
+    "tsconfig.node.json",
+    "vite.config.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/65/6cef442c9e/0/metadata.json",
+      "transcript": "/65/6cef442c9e/0/full.jsonl",
+      "content_hash": "/65/6cef442c9e/0/content_hash.txt",
+      "prompt": "/65/6cef442c9e/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 50,
+    "cache_creation_tokens": 133486,
+    "cache_read_tokens": 2491578,
+    "output_tokens": 41603,
+    "api_call_count": 40
+  }
+}

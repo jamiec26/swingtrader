@@ -1,0 +1,16 @@
+Use the claude_design MCP (https://api.anthropic.com/v1/design/mcp, auth via /design-login) to import this project:
+https://claude.ai/design/p/6515ce7d-0237-43c4-acd8-6f722d042b17?file=Kagi+Trading+Workstation+Spec.dc.html
+
+Implement: Kagi Trading Workstation Spec.dc.html
+
+---
+
+whats going on?
+
+---
+
+continue, and att 95% pull to github
+
+---
+
+push to github, but outline what has been built and not built for AG to pick up

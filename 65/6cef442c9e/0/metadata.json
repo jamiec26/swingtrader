@@ -1,0 +1,89 @@
+{
+  "cli_version": "0.7.7",
+  "checkpoint_id": "656cef442c9e",
+  "session_id": "d7faade6-7622-4fd4-a970-c8678812a0d9",
+  "strategy": "manual-commit",
+  "created_at": "2026-06-24T22:33:21.949627381Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "package.json",
+    "vite.config.ts",
+    "tsconfig.json",
+    "tsconfig.node.json",
+    "index.html",
+    "src/types/index.ts",
+    "src/store/index.ts",
+    "src/api/client.ts",
+    "src/styles/globals.css",
+    "src/components/ui/SignalBadge.tsx",
+    "src/components/ui/ScoreBar.tsx",
+    "src/components/ui/KpiTile.tsx",
+    "src/components/ui/Button.tsx",
+    "src/components/ui/RRBar.tsx",
+    "src/components/layout/NavRail.tsx",
+    "src/components/layout/CommandPalette.tsx",
+    "src/components/scan/MarketScan.tsx",
+    "src/components/board/OpportunityBoard.tsx",
+    "src/components/workspace/KagiChart.tsx",
+    "src/components/workspace/SignalPanel.tsx",
+    ".gitignore",
+    "HANDOFF.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-sonnet-4-6",
+  "turn_id": "df816929e3e3",
+  "token_usage": {
+    "input_tokens": 50,
+    "cache_creation_tokens": 133486,
+    "cache_read_tokens": 2491578,
+    "output_tokens": 41603,
+    "api_call_count": 40
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-06-24T22:33:21.924041808Z",
+    "agent_lines": 185,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 185,
+    "total_lines_changed": 185,
+    "agent_percentage": 100,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 2609,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "index.html": 18,
+        "package.json": 26,
+        "src/api/client.ts": 94,
+        "src/components/board/OpportunityBoard.tsx": 358,
+        "src/components/layout/CommandPalette.tsx": 181,
+        "src/components/layout/NavRail.tsx": 135,
+        "src/components/scan/MarketScan.tsx": 613,
+        "src/components/ui/Button.tsx": 83,
+        "src/components/ui/KpiTile.tsx": 55,
+        "src/components/ui/RRBar.tsx": 83,
+        "src/components/ui/ScoreBar.tsx": 54,
+        "src/components/ui/SignalBadge.tsx": 31,
+        "src/components/workspace/KagiChart.tsx": 197,
+        "src/components/workspace/SignalPanel.tsx": 248,
+        "src/store/index.ts": 82,
+        "src/styles/globals.css": 77,
+        "src/types/index.ts": 223,
+        "tsconfig.json": 25,
+        "tsconfig.node.json": 10,
+        "vite.config.ts": 16
+      }
+    }
+  ]
+}
