@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useStore } from './store'
 import { api } from './api/client'
 import { NavRail } from './components/layout/NavRail'
@@ -21,6 +21,8 @@ export default function App() {
     setScanProgress,
     setSignals,
   } = useStore()
+
+  const activeScanRef = useRef(false)
 
   // Load account data, latest scan, and initial signals on mount
   useEffect(() => {
@@ -47,6 +49,13 @@ export default function App() {
     }
     initScanState()
   }, [setAccount, setScanProgress, setSignals])
+
+  // Track if a scan was actively started/resumed in this browser session
+  useEffect(() => {
+    if (scanProgress?.status === 'running') {
+      activeScanRef.current = true
+    }
+  }, [scanProgress?.status])
 
   // Poll active scan globally so it continues in background and updates store/board
   useEffect(() => {
@@ -75,15 +84,20 @@ export default function App() {
           if (isMounted) {
             setSignals(sigs)
             // Auto-navigate to board if we are currently looking at the scan page
-            if (useStore.getState().workspace === 'scan') {
+            // and this scan was actively started/resumed in this session
+            if (activeScanRef.current && useStore.getState().workspace === 'scan') {
+              activeScanRef.current = false
               setTimeout(() => {
                 if (useStore.getState().workspace === 'scan') {
                   setWorkspace('board')
                 }
               }, 800)
+            } else {
+              activeScanRef.current = false
             }
           }
         } else if (progress.status === 'error' || progress.status === 'cancelled') {
+          activeScanRef.current = false
           clearInterval(interval)
         }
       } catch (err) {

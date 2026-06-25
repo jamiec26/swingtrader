@@ -666,6 +666,7 @@ def background_scan_task(run_id: int, config: Dict[str, Any], resume: bool = Fal
                     log_entry["result"] = "none"
             else:
                 log_entry["result"] = "none"
+            run.log_lines = list(log_lines)
             run.signals_found = signals_found
             db.commit()
             time.sleep(0.05) # subtle throttle to show progressive scanning animation
@@ -685,6 +686,7 @@ def background_scan_task(run_id: int, config: Dict[str, Any], resume: bool = Fal
     except Exception as e:
         logger.error(f"Scan error on run #{run_id}: {e}", exc_info=True)
         try:
+            db.rollback()
             run = db.query(models.ScanRun).filter(models.ScanRun.id == run_id).first()
             if run:
                 run.status = "error"
