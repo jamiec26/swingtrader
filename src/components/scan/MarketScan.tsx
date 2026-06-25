@@ -27,7 +27,7 @@ const RESULT_LABEL = {
 }
 
 export function MarketScan() {
-  const { scanConfig, setScanConfig, setScanProgress, scanProgress, setWorkspace, setSignals } =
+  const { scanConfig, setScanConfig, setScanProgress, scanProgress, setWorkspace, setSignals, setSelectedSignal, signals } =
     useStore()
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -43,9 +43,27 @@ export function MarketScan() {
 
   async function startScan() {
     setError(null)
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
     try {
       const { run_id } = await api.scan.start(scanConfig)
-      poll(run_id)
+      // Set to running to trigger global polling in App.tsx
+      setScanProgress({
+        run_id,
+        status: 'running',
+        pct_complete: 0,
+        markets_scanned: 0,
+        markets_total: scanConfig.universe.length,
+        symbols_analyzed: 0,
+        signals_found: 0,
+        eta_seconds: 120,
+        log_lines: [],
+        started_at: new Date().toISOString(),
+        ended_at: null,
+        error: null,
+      })
     } catch {
       setError('Backend not reachable — start the Python server with: cd backend && python main.py')
       // Demo mode: simulate a scan
@@ -53,33 +71,36 @@ export function MarketScan() {
     }
   }
 
-  async function cancelScan() {
+  async function resumeScan() {
     if (!scanProgress) return
+    setError(null)
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
     try {
-      await api.scan.cancel(scanProgress.run_id)
-    } catch { /* silent */ }
-    if (pollRef.current) clearInterval(pollRef.current)
-    setScanProgress({ ...scanProgress, status: 'cancelled' })
+      const { run_id } = await api.scan.resume(scanProgress.run_id, scanConfig)
+      setScanProgress({
+        ...scanProgress,
+        status: 'running'
+      })
+    } catch (err: any) {
+      setError(err?.message || 'Failed to resume scan.')
+    }
   }
 
-  function poll(runId: number) {
-    pollRef.current = setInterval(async () => {
-      try {
-        const progress = await api.scan.progress(runId)
-        setScanProgress(progress)
-        if (progress.status === 'complete') {
-          clearInterval(pollRef.current!)
-          const sigs = await api.signals.list(runId)
-          setSignals(sigs)
-          setTimeout(() => setWorkspace('board'), 800)
-        }
-        if (progress.status === 'error' || progress.status === 'cancelled') {
-          clearInterval(pollRef.current!)
-        }
-      } catch {
-        clearInterval(pollRef.current!)
-      }
-    }, 800)
+  async function cancelScan() {
+    if (!scanProgress) return
+    if (scanProgress.run_id === 0) {
+      // Simulated scan
+      if (pollRef.current) clearInterval(pollRef.current)
+      setScanProgress({ ...scanProgress, status: 'cancelled' })
+      return
+    }
+    try {
+      await api.scan.cancel(scanProgress.run_id)
+      setScanProgress({ ...scanProgress, status: 'cancelled' })
+    } catch { /* silent */ }
   }
 
   function simulateScan() {
@@ -89,6 +110,9 @@ export function MarketScan() {
     const logLines: ScanProgress['log_lines'] = []
     const tickers = ['NVDA','AAPL','MSFT','GOOGL','META','AMZN','TSLA','EUR/USD','GBP/USD','XLE','SPY','QQQ','BTC/USD','GLD','JPY/USD']
     let i = 0
+    const activeSignals: any[] = []
+
+    setSignals([])
 
     const mockProgress: ScanProgress = {
       run_id: 0,
@@ -115,7 +139,36 @@ export function MarketScan() {
         const result = hasSignal
           ? (Math.random() > 0.4 ? 'bull' : 'bear')
           : 'none'
-        if (result !== 'none') signalsFound++
+        if (result !== 'none') {
+          signalsFound++
+          const demoSig = DEMO_SIGNALS.find(s => s.ticker === tickers[i]) || {
+            id: Math.random(),
+            symbol_id: Math.random(),
+            scan_id: 0,
+            ticker: tickers[i],
+            name: tickers[i] + ' Inc.',
+            market: 'stock' as const,
+            type: result as 'bull' | 'bear',
+            confidence: Math.floor(Math.random() * 30) + 62,
+            trend: 0.05,
+            rr: 2.5,
+            expected_move: 5.5,
+            win_rate: 65,
+            vol_confirm: true,
+            entry: 100.0,
+            stop: 95.0,
+            t1: 110.0,
+            t2: 120.0,
+            t3: 130.0,
+            signal_age_days: 0,
+            pinned: false,
+            factors: { trend_strength: 70, volume_confirmation: 80, historical_win_rate: 65, mtf_alignment: 75, breakout_cleanliness: 80 },
+            analogue_count: 50,
+            invalidation_note: 'Close below stop invalidates',
+          }
+          activeSignals.push(demoSig)
+          setSignals([...activeSignals])
+        }
         logLines.unshift({
           ticker: tickers[i],
           market: i < 7 ? 'stocks' : i < 10 ? 'forex' : i < 13 ? 'etf' : 'crypto',
@@ -144,8 +197,9 @@ export function MarketScan() {
         clearInterval(pollRef.current!)
         updated.ended_at = new Date().toISOString()
         setScanProgress({ ...updated, status: 'complete' })
-        // Load mock signals and navigate
-        setSignals(DEMO_SIGNALS)
+        if (activeSignals.length === 0) {
+          setSignals(DEMO_SIGNALS)
+        }
         setTimeout(() => setWorkspace('board'), 900)
       }
     }, 500)
@@ -156,6 +210,32 @@ export function MarketScan() {
     setScanConfig({
       universe: u.includes(m) ? u.filter((x) => x !== m) : [...u, m],
     })
+  }
+
+  const formatScanTime = (isoString?: string | null) => {
+    if (!isoString) return '16:00'
+    try {
+      const d = new Date(isoString)
+      return d.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      })
+    } catch {
+      return '16:00'
+    }
+  }
+
+  const formatScanSub = (isoString?: string | null) => {
+    if (!isoString) return ' ET'
+    try {
+      const d = new Date(isoString)
+      const tz = d.toLocaleDateString('en-US', { timeZoneName: 'short' }).split(', ')[1] || ''
+      return ` ${tz}`
+    } catch {
+      return ' ET'
+    }
   }
 
   const p = scanProgress
@@ -227,9 +307,233 @@ export function MarketScan() {
             </div>
           </div>
 
+          {/* Exchange Filter */}
+          <div>
+            <div
+              style={{
+                fontSize: '11px',
+                color: 'var(--dim)',
+                marginBottom: '8px',
+                letterSpacing: '0.08em',
+              }}
+            >
+              EXCHANGE (STOCKS)
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {(['ALL', 'NASDAQ', 'NYSE'] as const).map((ex) => {
+                const active = scanConfig.exchange === ex || (!scanConfig.exchange && ex === 'ALL')
+                return (
+                  <button
+                    key={ex}
+                    onClick={() => setScanConfig({ exchange: ex })}
+                    style={{
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: '11px',
+                      color: active ? 'var(--blue)' : 'var(--dim)',
+                      background: active ? 'rgba(76,154,255,0.1)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${active ? 'rgba(76,154,255,0.3)' : 'transparent'}`,
+                      borderRadius: '5px',
+                      padding: '4px 9px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {ex}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Limit Filter */}
+          <div>
+            <div
+              style={{
+                fontSize: '11px',
+                color: 'var(--dim)',
+                marginBottom: '8px',
+                letterSpacing: '0.08em',
+              }}
+            >
+              STOCK LIMIT (BY MARKET CAP)
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {([20, 50, 100, 200, 500, 1000] as const).map((lim) => {
+                const active = scanConfig.limit === lim || (!scanConfig.limit && lim === 50)
+                return (
+                  <button
+                    key={lim}
+                    onClick={() => setScanConfig({ limit: lim })}
+                    style={{
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: '11px',
+                      color: active ? 'var(--blue)' : 'var(--dim)',
+                      background: active ? 'rgba(76,154,255,0.1)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${active ? 'rgba(76,154,255,0.3)' : 'transparent'}`,
+                      borderRadius: '5px',
+                      padding: '4px 9px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    Top {lim}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Sector Filter */}
+          <div>
+            <div
+              style={{
+                fontSize: '11px',
+                color: 'var(--dim)',
+                marginBottom: '8px',
+                letterSpacing: '0.08em',
+              }}
+            >
+              SECTOR (STOCKS)
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {(['ALL', 'Technology', 'Financials', 'Healthcare', 'Energy', 'Consumer'] as const).map((sec) => {
+                const active = scanConfig.sector === sec || (!scanConfig.sector && sec === 'ALL')
+                return (
+                  <button
+                    key={sec}
+                    onClick={() => setScanConfig({ sector: sec })}
+                    style={{
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: '11px',
+                      color: active ? 'var(--blue)' : 'var(--dim)',
+                      background: active ? 'rgba(76,154,255,0.1)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${active ? 'rgba(76,154,255,0.3)' : 'transparent'}`,
+                      borderRadius: '5px',
+                      padding: '4px 9px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {sec}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Price Filter */}
+          <div>
+            <div
+              style={{
+                fontSize: '11px',
+                color: 'var(--dim)',
+                marginBottom: '8px',
+                letterSpacing: '0.08em',
+              }}
+            >
+              PRICE FILTER (STOCKS)
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {([
+                { value: 'ALL', label: 'ALL' },
+                { value: '<50', label: '< $50' },
+                { value: '>50', label: '> $50' },
+                { value: '>100', label: '> $100' },
+              ] as const).map((item) => {
+                const active = scanConfig.price_filter === item.value || (!scanConfig.price_filter && item.value === 'ALL')
+                return (
+                  <button
+                    key={item.value}
+                    onClick={() => setScanConfig({ price_filter: item.value })}
+                    style={{
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: '11px',
+                      color: active ? 'var(--blue)' : 'var(--dim)',
+                      background: active ? 'rgba(76,154,255,0.1)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${active ? 'rgba(76,154,255,0.3)' : 'transparent'}`,
+                      borderRadius: '5px',
+                      padding: '4px 9px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Reversal Method Selector */}
+          <div>
+            <div
+              style={{
+                fontSize: '11px',
+                color: 'var(--dim)',
+                marginBottom: '8px',
+                letterSpacing: '0.08em',
+              }}
+            >
+              REVERSAL METHOD
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+              {[
+                { value: 'pct', label: 'Percentage' },
+                { value: 'atr', label: 'ATR' },
+                { value: 'fixed', label: 'Traditional' },
+              ].map((item) => {
+                const active = scanConfig.reversal_type === item.value
+                return (
+                  <button
+                    key={item.value}
+                    onClick={() => {
+                      const defVal = item.value === 'pct' ? 4 : item.value === 'atr' ? 1.5 : 5
+                      setScanConfig({ reversal_type: item.value as any, reversal_value: defVal })
+                    }}
+                    style={{
+                      fontFamily: "'IBM Plex Mono', monospace",
+                      fontSize: '11px',
+                      color: active ? 'var(--blue)' : 'var(--dim)',
+                      background: active ? 'rgba(76,154,255,0.1)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${active ? 'rgba(76,154,255,0.3)' : 'transparent'}`,
+                      borderRadius: '5px',
+                      padding: '4px 9px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                )
+              })}
+            </div>
+            {/* Reversal Value input */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
+              <span style={{ fontSize: '13px', color: 'var(--muted)' }}>Reversal Value</span>
+              <input
+                type="number"
+                step={scanConfig.reversal_type === 'atr' ? 0.1 : 0.5}
+                min={0.1}
+                value={scanConfig.reversal_value}
+                onChange={(e) => setScanConfig({ reversal_value: parseFloat(e.target.value) || 0.1 })}
+                style={{
+                  width: '80px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--ink)',
+                  fontSize: '13px',
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  outline: 'none',
+                  textAlign: 'right',
+                }}
+              />
+            </div>
+          </div>
+
           {[
             { label: 'Timeframe', value: 'Daily' },
-            { label: 'Reversal amount', value: `${scanConfig.reversal_value}% / ATR` },
             { label: 'Min confidence', value: String(scanConfig.min_confidence) },
             { label: 'Watchlists', value: 'All (6)' },
           ].map(({ label, value }) => (
@@ -305,14 +609,26 @@ export function MarketScan() {
                 {scanConfig.universe.length !== 1 ? 's' : ''} selected · daily timeframe
               </p>
             </div>
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={startScan}
-              style={{ letterSpacing: '0.08em', minWidth: '200px' }}
-            >
-              SCAN MARKETS
-            </Button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={startScan}
+                style={{ letterSpacing: '0.08em', minWidth: '180px' }}
+              >
+                SCAN MARKETS
+              </Button>
+              {p && (p.status === 'cancelled' || p.status === 'error') && (
+                <Button
+                  variant="confirm"
+                  size="lg"
+                  onClick={resumeScan}
+                  style={{ letterSpacing: '0.08em', minWidth: '180px' }}
+                >
+                  RESUME SCAN
+                </Button>
+              )}
+            </div>
             {p?.status === 'cancelled' && (
               <span
                 style={{
@@ -321,7 +637,18 @@ export function MarketScan() {
                   color: 'var(--dim)',
                 }}
               >
-                Scan cancelled
+                Scan cancelled · {p.symbols_analyzed} symbols analyzed
+              </span>
+            )}
+            {p?.status === 'error' && (
+              <span
+                style={{
+                  fontFamily: "'IBM Plex Mono', monospace",
+                  fontSize: '12px',
+                  color: 'var(--red)',
+                }}
+              >
+                Scan error: {p.error}
               </span>
             )}
           </div>
@@ -370,9 +697,13 @@ export function MarketScan() {
                   {String((p.eta_seconds ?? 0) % 60).padStart(2, '0')} REMAINING
                 </span>
               )}
-              {!isDone && (
-                <Button variant="ghost" size="sm" onClick={cancelScan} style={{ marginLeft: isDone ? 'auto' : undefined }}>
+              {!isDone ? (
+                <Button variant="ghost" size="sm" onClick={cancelScan}>
                   Cancel
+                </Button>
+              ) : (
+                <Button variant="primary" size="sm" onClick={startScan} style={{ marginLeft: 'auto' }}>
+                  RE-SCAN
                 </Button>
               )}
             </div>
@@ -442,7 +773,7 @@ export function MarketScan() {
                   { label: 'MARKETS SCANNED', value: `${p?.markets_scanned ?? 0}`, sub: `/ ${p?.markets_total ?? 0}` },
                   { label: 'SYMBOLS ANALYZED', value: (p?.symbols_analyzed ?? 0).toLocaleString() },
                   { label: 'SIGNALS FOUND', value: String(p?.signals_found ?? 0), color: 'var(--green)' },
-                  { label: 'DATA AS OF', value: '16:00', sub: ' ET' },
+                  { label: 'DATA AS OF', value: formatScanTime(p?.ended_at || p?.started_at), sub: formatScanSub(p?.ended_at || p?.started_at) },
                 ].map((tile) => (
                   <div
                     key={tile.label}
@@ -519,24 +850,57 @@ export function MarketScan() {
                 minHeight: 160,
               }}
             >
-              {p?.log_lines.map((line, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    color: i === 0 ? 'var(--muted)' : 'var(--dim)',
-                  }}
-                >
-                  <span>
-                    {line.ticker} · {line.market} · {line.timeframe}
-                  </span>
-                  <span style={{ color: RESULT_COLOR[line.result] }}>
-                    {RESULT_LABEL[line.result]}
-                    {line.confidence != null && ` · conf ${line.confidence}`}
-                  </span>
-                </div>
-              ))}
+              {(() => {
+                const sortedLogLines = [...(p?.log_lines ?? [])].sort((a, b) => {
+                  const aSig = a.result === 'bull' || a.result === 'bear'
+                  const bSig = b.result === 'bull' || b.result === 'bear'
+                  if (aSig && !bSig) return -1
+                  if (!aSig && bSig) return 1
+                  return 0
+                })
+
+                return sortedLogLines.map((line, idx) => {
+                  const hasSignal = line.result === 'bull' || line.result === 'bear'
+                  
+                  const handleRowClick = () => {
+                    if (!hasSignal) return
+                    const sig = signals.find((s) => s.ticker.toUpperCase() === line.ticker.toUpperCase())
+                    if (sig) {
+                      setSelectedSignal(sig)
+                      setWorkspace('workspace')
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={idx}
+                      onClick={handleRowClick}
+                      className={hasSignal ? 'log-line-clickable' : undefined}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        color: hasSignal ? 'var(--ink)' : (idx === 0 ? 'var(--muted)' : 'var(--dim)'),
+                        cursor: hasSignal ? 'pointer' : 'default',
+                        padding: '2px 8px',
+                        margin: '2px -8px',
+                        borderRadius: '4px',
+                        borderLeft: hasSignal 
+                          ? `3px solid ${line.result === 'bull' ? 'var(--green)' : 'var(--red)'}`
+                          : '3px solid transparent',
+                        paddingLeft: hasSignal ? '10px' : '8px',
+                      }}
+                    >
+                      <span>
+                        {line.ticker} · {line.market} · {line.timeframe}
+                      </span>
+                      <span style={{ color: RESULT_COLOR[line.result], fontWeight: hasSignal ? 600 : 'normal' }}>
+                        {RESULT_LABEL[line.result]}
+                        {line.confidence != null && ` · conf ${line.confidence}`}
+                      </span>
+                    </div>
+                  )
+                })
+              })()}
               {(p?.log_lines.length ?? 0) === 0 && (
                 <span style={{ color: 'var(--subtle)' }}>Initializing pipeline…</span>
               )}

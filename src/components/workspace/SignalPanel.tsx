@@ -18,6 +18,14 @@ const FACTOR_WEIGHTS: Record<string, number> = {
   breakout_cleanliness: 0.15,
 }
 
+const FACTOR_EXPLANATIONS: Record<string, string> = {
+  trend_strength: 'Trend Strength (30% weight): Measures the gap between fast and slow EMAs to verify trend velocity.',
+  volume_confirmation: 'Volume Confirm (20% weight): Compares recent trading volume against the 20-day MA volume to ensure institutional interest.',
+  historical_win_rate: 'Win Rate (20% weight): Calculates success rate of historical price analogues using a k-NN Euclidean distance classifier.',
+  mtf_alignment: 'MTF Alignment (15% weight): Confirms alignment across weekly, daily, and 4-hour trend timeframes.',
+  breakout_cleanliness: 'Breakout Clarity (15% weight): Scores how cleanly the price broke through the prior Kagi pivot level (shoulder or waist).',
+}
+
 interface Props {
   signal: Signal
 }
@@ -100,7 +108,16 @@ export function SignalPanel({ signal }: Props) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {Object.entries(signal.factors).map(([key, val]) => (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              key={key}
+              title={FACTOR_EXPLANATIONS[key]}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                cursor: 'help',
+              }}
+            >
               <div
                 style={{
                   fontFamily: "'IBM Plex Mono', monospace",
@@ -108,6 +125,8 @@ export function SignalPanel({ signal }: Props) {
                   color: 'var(--muted)',
                   width: '120px',
                   flexShrink: 0,
+                  borderBottom: '1px dotted var(--dim)',
+                  paddingBottom: '2px',
                 }}
               >
                 {FACTOR_LABELS[key] ?? key}

@@ -44,6 +44,7 @@ export const api = {
   scan: {
     start: (config: ScanConfig) => post<{ run_id: number }>('/scan/start', config),
     cancel: (runId: number) => post<void>(`/scan/${runId}/cancel`),
+    resume: (runId: number, config: ScanConfig) => post<{ run_id: number }>(`/scan/${runId}/resume`, config),
     progress: (runId: number) => get<ScanProgress>(`/scan/${runId}/progress`),
     latest: () => get<ScanProgress | null>('/scan/latest'),
   },
@@ -52,6 +53,8 @@ export const api = {
     list: (scanId?: number) =>
       get<Signal[]>(scanId ? `/signals?scan_id=${scanId}` : '/signals'),
     get: (id: number) => get<Signal>(`/signals/${id}`),
+    analyze: (ticker: string, reversalType?: string, reversalValue?: number) =>
+      get<Signal>(`/signals/analyze?ticker=${encodeURIComponent(ticker)}${reversalType ? `&reversal_type=${reversalType}` : ''}${reversalValue != null ? `&reversal_value=${reversalValue}` : ''}`),
     pin: (id: number, pinned: boolean) =>
       post<void>(`/signals/${id}/pin`, { pinned }),
     kagi: (symbolId: number, timeframe: string) =>

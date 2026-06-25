@@ -89,6 +89,10 @@ export interface ScanConfig {
   reversal_value: number
   min_confidence: number
   watchlist_ids: number[]
+  exchange: string
+  limit: number
+  sector: string
+  price_filter: string
 }
 
 export interface LogLine {

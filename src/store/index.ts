@@ -16,6 +16,10 @@ const DEFAULT_SCAN_CONFIG: ScanConfig = {
   reversal_value: 4,
   min_confidence: 60,
   watchlist_ids: [],
+  exchange: 'ALL',
+  limit: 50,
+  sector: 'ALL',
+  price_filter: 'ALL',
 }
 
 const DEFAULT_ACCOUNT: Account = {
